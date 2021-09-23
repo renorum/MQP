@@ -1,0 +1,179 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r global_options, include=FALSE}
+# set global chunk options...  
+knitr::opts_chunk$set(comment     = "",
+                      echo        = TRUE, 
+                      comment     = FALSE,
+                      warning     = FALSE, 
+                      message     = FALSE)
+
+```
+
+
+``````{r, echo=FALSE, results=FALSE, warning=FALSE, message=FALSE}
+### ----- load package(s) ----- ###
+
+library("tidyverse")    
+library("forcats")
+library("lubridate")    
+library("readxl")
+library("reshape2")
+library("data.table")
+library("dplyr")
+library("readr")
+
+library("psych")        
+library("furniture")    
+library("stargazer")    
+library("pander")       
+
+panderOptions('digits', 3)
+panderOptions('round', 3)
+panderOptions('keep.trailing.zeros', TRUE)
+
+```
+
+
+```{r}
+# csv with cleaned data (removed blank & N/A)
+aggregated_data <- read_csv("~/Desktop/MQP files/Data/Reilly Copy of FH2T_aggregation_overall_merge_2021_03_25 - Sheet1.csv")
+
+# csv with cleaned data (removed blanks)
+assessment_data <- read_csv("~/Desktop/MQP files/Data/Assessment_merged_2021_07_16_state_assessment_N=4321 - Sheet1.csv")
+
+# merged two csvs above
+total <- merge(aggregated_data,assessment_data,by="student_id")
+
+# number of entries in merged data
+nrow(total)
+```
+```{r}
+# summary stats of merged data
+summary(total)
+
+# means of merged data
+mean(total$o_distinct_completed, na.rm = TRUE)
+mean(total$o_percent_gobacks, na.rm = TRUE)
+mean(total$o_avg_resets, na.rm = TRUE)
+mean(total$o_avg_time_interaction_first, na.rm = TRUE)
+mean(total$post.total_math_score, na.rm = TRUE)
+mean(total$pre.total_math_score, na.rm = TRUE)
+mean(total$math_score_7th.grade, na.rm = TRUE)
+
+# standard deviations of merged data
+sd(total$o_distinct_completed, na.rm = TRUE)
+sd(total$o_percent_gobacks, na.rm = TRUE)
+sd(total$o_avg_resets, na.rm = TRUE)
+sd(total$o_avg_time_interaction_first, na.rm = TRUE)
+sd(total$post.total_math_score, na.rm = TRUE)
+sd(total$pre.total_math_score, na.rm = TRUE)
+sd(total$math_score_7th, na.rm = TRUE)
+
+# boxplots of aggreagted data (no test scores)
+boxplot(aggregated_data$o_distinct_completed, main="o_distinct_completed", ylab="Number of Distinct Problems Completed")
+boxplot(aggregated_data$o_percent_gobacks, main="o_percent_gobacks", ylab="Percent of the Completed Problems that the User Went Back and Completed")
+boxplot(aggregated_data$o_avg_resets, main="o_avg_resets", ylab="Average Number of Times the User Reset a Problem")
+boxplot(aggregated_data$o_avg_time_interaction_first, main="o_avg_time_interaction_first", ylab="Average Amount of Time User Took Before First Interaction")
+
+# histograms of aggregated data (no test scores)
+hist(aggregated_data$o_distinct_completed)
+hist(aggregated_data$o_percent_gobacks)
+hist(aggregated_data$o_avg_resets)
+hist(aggregated_data$o_avg_time_interaction_first)
+
+# maximum of each variable in merged data
+max(total$o_distinct_completed, na.rm = TRUE)
+max(total$o_percent_gobacks, na.rm = TRUE)
+max(total$o_avg_resets, na.rm = TRUE)
+max(total$o_avg_time_interaction_first, na.rm = TRUE)
+max(total$post.total_math_score, na.rm = TRUE)
+max(total$pre.total_math_score, na.rm = TRUE)
+max(total$math_score_7th.grade, na.rm = TRUE)
+```
+
+
+```{r}
+# new variables analysis, o_percentage_completed, o_percentage_hint, o_total_error
+summary(aggregated_data$o_percentage_completed)
+summary(aggregated_data$o_percentage_hint)
+summary(aggregated_data$o_total_error)
+
+# means aggregated data - new variables
+mean(aggregated_data$o_percentage_completed, na.rm = TRUE)
+mean(aggregated_data$o_percentage_hint, na.rm = TRUE)
+mean(aggregated_data$o_total_error, na.rm = TRUE)
+
+# standard deviations aggregated data - new variables
+sd(aggregated_data$o_percentage_completed, na.rm = TRUE)
+sd(aggregated_data$o_percentage_hint, na.rm = TRUE)
+sd(aggregated_data$o_total_error, na.rm = TRUE)
+
+# boxplots aggregated data - new variables
+boxplot(aggregated_data$o_percentage_completed, main="o_percentage_completed", ylab="Percent of Distinct Problems Completed")
+boxplot(aggregated_data$o_percentage_hint, main="o_percentage_hint", ylab="Percent of the Attempted Problems where the User Requested a Hint")
+boxplot(aggregated_data$o_total_error, main="o_total_error", ylab="Total Number of Errors a User Made on the Problem Set")
+
+#histograms aggregated data - new variables
+hist(aggregated_data$o_percentage_completed)
+hist(aggregated_data$o_percentage_hint)
+hist(aggregated_data$o_total_error)
+
+
+```
+```{r}
+# correlation analysis original variables - merged data
+cor(total$o_distinct_completed, total$o_percent_gobacks)
+cor(total$o_distinct_completed, total$o_avg_resets)
+cor(total$o_distinct_completed,total$o_avg_time_interaction_first)
+cor(total$o_percent_gobacks, total$o_avg_resets)
+cor(total$o_percent_gobacks, total$o_avg_time_interaction_first)
+cor(total$o_avg_resets, total$o_avg_time_interaction_first)
+cor(total$pre.total_math_score, total$o_distinct_completed)
+cor(total$pre.total_math_score, total$o_percent_gobacks)
+cor(total$pre.total_math_score, total$o_avg_resets)
+cor(total$pre.total_math_score, total$post.total_math_score)
+cor(total$pre.total_math_score, total$o_avg_time_interaction_first)
+cor(total$post.total_math_score, total$o_distinct_completed)
+cor(total$post.total_math_score, total$o_percent_gobacks)
+cor(total$post.total_math_score, total$o_avg_resets)
+cor(total$post.total_math_score, total$o_avg_time_interaction_first)
+cor(total$math_score_7th.grade, total$o_distinct_completed)
+cor(total$math_score_7th.grade, total$o_percent_gobacks)
+cor(total$math_score_7th.grade, total$o_avg_resets)
+cor(total$math_score_7th.grade, total$o_avg_time_interaction_first)
+cor(total$math_score_7th.grade, total$post.total_math_score)
+cor(total$math_score_7th.grade, total$pre.total_math_score)
+
+# correlation analysis new variables - merged data
+cor(total$o_percentage_completed, total$o_percentage_hint)
+cor(total$o_percentage_completed, total$o_total_error)
+cor(total$o_percentage_hint, total$o_total_error)
+
+# p-values - merged data
+cor.test(total$o_distinct_completed, total$o_percent_gobacks, method = "pearson")
+cor.test(total$o_distinct_completed, total$o_avg_resets, method = "pearson")
+cor.test(total$o_distinct_completed,total$o_avg_time_interaction_first, method = "pearson")
+cor.test(total$o_percent_gobacks, total$o_avg_resets, method = "pearson")
+cor.test(total$o_percent_gobacks, total$o_avg_time_interaction_first, method = "pearson")
+cor.test(total$o_avg_resets, total$o_avg_time_interaction_first, method = "pearson")
+cor.test(total$pre.total_math_score, total$o_distinct_completed, method = "pearson")
+cor.test(total$pre.total_math_score, total$o_percent_gobacks, method = "pearson")
+cor.test(total$pre.total_math_score, total$o_avg_resets, method = "pearson")
+cor.test(total$pre.total_math_score, total$post.total_math_score, method = "pearson")
+cor.test(total$pre.total_math_score, total$o_avg_time_interaction_first, method = "pearson")
+cor.test(total$post.total_math_score, total$o_distinct_completed, method = "pearson")
+cor.test(total$post.total_math_score, total$o_percent_gobacks, method = "pearson")
+cor.test(total$post.total_math_score, total$o_avg_resets, method = "pearson")
+cor.test(total$post.total_math_score, total$o_avg_time_interaction_first, method = "pearson")
+cor.test(total$math_score_7th.grade, total$o_distinct_completed, method = "pearson")
+cor.test(total$math_score_7th.grade, total$o_percent_gobacks, method = "pearson")
+cor.test(total$math_score_7th.grade, total$o_avg_resets, method = "pearson")
+cor.test(total$math_score_7th.grade, total$o_avg_time_interaction_first, method = "pearson")
+cor.test(total$math_score_7th.grade, total$post.total_math_score, method = "pearson")
+cor.test(total$math_score_7th.grade, total$pre.total_math_score, method = "pearson")
+```
+
