@@ -1,0 +1,522 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r global_options, include=FALSE}
+# set global chunk options...  
+knitr::opts_chunk$set(comment     = "",
+                      echo        = TRUE, 
+                      comment     = FALSE,
+                      warning     = FALSE, 
+                      message     = FALSE)
+```
+
+
+``````{r, echo=FALSE, results=FALSE, warning=FALSE, message=FALSE}
+### ----- load package(s) ----- ###
+
+library("tidyverse")    
+library("forcats")
+library("lubridate")    
+library("readxl")
+library("reshape2")
+library("data.table")
+library("dplyr")
+library("readr")
+
+library("psych")        
+library("furniture")    
+library("stargazer")    
+library("pander")       
+
+panderOptions('digits', 3)
+panderOptions('round', 3)
+panderOptions('keep.trailing.zeros', TRUE)
+
+library(cluster)  # clustering algorithms
+library(NbClust)  # clustering algorithms & visualization
+library(factoextra)
+library(ggfortify)
+library(ggplot2)
+library(GGally)
+```
+
+```{r}
+# importing data
+# csv
+aggregated_data <- read_csv("~/Desktop/MQP files/Data/Reilly Copy of FH2T_aggregation_overall_merge_2021_03_25 - Sheet1.csv")
+
+# csv
+assessment_data <- read_csv("~/Desktop/MQP files/Data/Assessment_pre and post scores - Sheet1.csv")
+
+# merge and cleaned csv
+clean_merge <- merge(aggregated_data,assessment_data,by="student_id") 
+
+# select variables to be used
+clean_merge2 <- clean_merge %>% select(o_percent_gobacks, 
+                                     o_distinct_completed,
+                                     o_avg_resets,
+                                     o_avg_time_interaction_first,
+                                     pre.total_math_score,
+                                     post.total_math_score)
+
+
+
+```
+
+```{r}
+# summary stats for test scores to determine which to use for cluster analysis
+
+print("Scale.Score_7th.grade")
+summary(total$Scale.Score_7th.grade)
+print("math_score_7th.grade")
+summary(total$math_score_7th.grade)
+print("pre.total_math_score")
+summary(total$pre.total_math_score)
+print("mid.total_math_score")
+summary(total$mid.total_math_score)
+print("post.total_math_score")
+summary(total$post.total_math_score)
+print("delayed.total_math_score")
+summary(total$delayed.total_math_score)
+
+```
+```{r}
+# numerical analysis for data with pre/post test scores
+# means of merged, cleaned data
+print("Means:")
+mean(clean_merge$o_distinct_completed, na.rm = TRUE)
+mean(clean_merge$o_percent_gobacks, na.rm = TRUE)
+mean(clean_merge$o_avg_resets, na.rm = TRUE)
+mean(clean_merge$o_avg_time_interaction_first, na.rm = TRUE)
+mean(clean_merge$post.total_math_score, na.rm = TRUE)
+mean(clean_merge$pre.total_math_score, na.rm = TRUE)
+
+# standard deviations of merged, cleaned data
+print("Standard Deviations:")
+sd(clean_merge$o_distinct_completed, na.rm = TRUE)
+sd(clean_merge$o_percent_gobacks, na.rm = TRUE)
+sd(clean_merge$o_avg_resets, na.rm = TRUE)
+sd(clean_merge$o_avg_time_interaction_first, na.rm = TRUE)
+sd(clean_merge$post.total_math_score, na.rm = TRUE)
+sd(clean_merge$pre.total_math_score, na.rm = TRUE)
+
+# boxplots of merged, cleaned data (no test scores)
+boxplot(clean_merge$o_distinct_completed, main="o_distinct_completed", ylab="Number of Distinct Problems Completed")
+boxplot(clean_merge$o_percent_gobacks, main="o_percent_gobacks", ylab="Percent of the Completed Problems that the User Went Back and Completed")
+boxplot(clean_merge$o_avg_resets, main="o_avg_resets", ylab="Average Number of Times the User Reset a Problem")
+boxplot(clean_merge$o_avg_time_interaction_first, main="o_avg_time_interaction_first", ylab="Average Amount of Time User Took Before First Interaction")
+
+# histograms of merged, cleaned data (no test scores)
+hist(clean_merge$o_distinct_completed)
+hist(clean_merge$o_percent_gobacks)
+hist(clean_merge$o_avg_resets)
+hist(clean_merge$o_avg_time_interaction_first)
+
+# maximum of each variable in merged data
+print('Max: ')
+max(clean_merge$o_distinct_completed, na.rm = TRUE)
+max(clean_merge$o_percent_gobacks, na.rm = TRUE)
+max(clean_merge$o_avg_resets, na.rm = TRUE)
+max(clean_merge$o_avg_time_interaction_first, na.rm = TRUE)
+max(clean_merge$post.total_math_score, na.rm = TRUE)
+max(clean_merge$pre.total_math_score, na.rm = TRUE)
+
+print("Min: ")
+min(clean_merge$o_distinct_completed, na.rm = TRUE)
+min(clean_merge$o_percent_gobacks, na.rm = TRUE)
+min(clean_merge$o_avg_resets, na.rm = TRUE)
+min(clean_merge$o_avg_time_interaction_first, na.rm = TRUE)
+```
+
+```{r}
+# correlation analysis merged, cleaned data
+cor(clean_merge$o_distinct_completed, clean_merge$o_percent_gobacks)
+cor(clean_merge$o_distinct_completed, clean_merge$o_avg_resets)
+cor(clean_merge$o_distinct_completed,clean_merge$o_avg_time_interaction_first)
+cor(clean_merge$o_percent_gobacks, clean_merge$o_avg_resets)
+cor(clean_merge$o_percent_gobacks, clean_merge$o_avg_time_interaction_first)
+cor(clean_merge$o_avg_resets, clean_merge$o_avg_time_interaction_first)
+cor(clean_merge$pre.total_math_score, clean_merge$o_distinct_completed)
+cor(clean_merge$pre.total_math_score, clean_merge$o_percent_gobacks)
+cor(clean_merge$pre.total_math_score, clean_merge$o_avg_resets)
+cor(clean_merge$pre.total_math_score, clean_merge$post.total_math_score)
+cor(clean_merge$pre.total_math_score, clean_merge$o_avg_time_interaction_first)
+cor(clean_merge$post.total_math_score, clean_merge$o_distinct_completed)
+cor(clean_merge$post.total_math_score, clean_merge$o_percent_gobacks)
+cor(clean_merge$post.total_math_score, clean_merge$o_avg_resets)
+cor(clean_merge$post.total_math_score, clean_merge$o_avg_time_interaction_first)
+```
+
+```{r}
+# p-values - merged, cleaned data
+cor.test(clean_merge$o_distinct_completed, clean_merge$o_percent_gobacks, method="pearson")
+cor.test(clean_merge$o_distinct_completed, clean_merge$o_avg_resets, method="pearson")
+cor.test(clean_merge$o_distinct_completed,clean_merge$o_avg_time_interaction_first, method="pearson")
+cor.test(clean_merge$o_percent_gobacks, clean_merge$o_avg_resets, method="pearson")
+cor.test(clean_merge$o_percent_gobacks, clean_merge$o_avg_time_interaction_first, method="pearson")
+cor.test(clean_merge$o_avg_resets, clean_merge$o_avg_time_interaction_first, method="pearson")
+cor.test(clean_merge$pre.total_math_score, clean_merge$o_distinct_completed, method="pearson")
+cor.test(clean_merge$pre.total_math_score, clean_merge$o_percent_gobacks, method="pearson")
+cor.test(clean_merge$pre.total_math_score, clean_merge$o_avg_resets, method="pearson")
+cor.test(clean_merge$pre.total_math_score, clean_merge$post.total_math_score, method="pearson")
+cor.test(clean_merge$pre.total_math_score, clean_merge$o_avg_time_interaction_first, method="pearson")
+cor.test(clean_merge$post.total_math_score, clean_merge$o_distinct_completed, method="pearson")
+cor.test(clean_merge$post.total_math_score, clean_merge$o_percent_gobacks, method="pearson")
+cor.test(clean_merge$post.total_math_score, clean_merge$o_avg_resets, method="pearson")
+cor.test(clean_merge$post.total_math_score, clean_merge$o_avg_time_interaction_first, method="pearson")
+```
+
+```{r}
+# minmax scaling
+minmax <- function(x){
+  return( (x-min(na.omit(x))) / (max(na.omit(x))-min(na.omit(x))) )
+}
+
+# min-max transformation and creating new variables
+clean_merge2$o_percent_gobacks <- minmax(clean_merge2$o_percent_gobacks)
+clean_merge2$o_distinct_completed <- minmax(clean_merge2$o_distinct_completed)
+clean_merge2$o_avg_resets <- minmax(clean_merge2$o_avg_resets)
+clean_merge2$o_avg_time_interaction_first <- minmax(clean_merge2$o_avg_time_interaction_first)
+
+# creating a new data frame 
+df_minmax <- clean_merge2 %>% select(o_percent_gobacks, 
+                                     o_distinct_completed,
+                                     o_avg_resets,
+                                     o_avg_time_interaction_first)
+```
+
+```{r}
+# determine the number of clusters (4 methods)
+# Elbow method (widely used, recommended)
+fviz_nbclust(df_minmax, kmeans, method = "wss") +
+    geom_vline(xintercept = 4, linetype = 2)+
+  labs(subtitle = "Elbow method")
+
+# Silhouette method
+fviz_nbclust(df_minmax, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+
+# Gap statistic
+set.seed(123)
+fviz_nbclust(df_minmax, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+  labs(subtitle = "Gap statistic method")
+
+# factoextra package 
+#fviz_nbclust(nb) + theme_minimal()
+```
+
+```{r}
+# applying kmeans clustering
+set.seed(20)
+
+fh2t_cluster <- kmeans(df_minmax, centers = 4, nstart = 25)
+str(fh2t_cluster) # inspect clusters, put the optimal number of clusters in "centers")  
+
+# Save the cluster number in the dataset as column 'cluster_results'
+clean_merge2$cluster_results <- as.factor(fh2t_cluster$cluster)
+
+clean_merge$cluster_results <- as.factor(fh2t_cluster$cluster)
+
+### Print the results
+print(fh2t_cluster)
+
+write.csv(clean_merge, "~/Desktop/MQP files/Data/12-4 Data/ClusterData1_15.csv")
+```
+
+```{r}
+# correlation plot
+library("RColorBrewer")
+library("corrplot")
+
+#aggregated_data <- read_csv("~/Desktop/MQP files/Data/Reilly Copy of FH2T_aggregation_overall_merge_2021_03_25 - Sheet1.csv")
+
+#assessment_data <- read_csv("~/Desktop/MQP files/Data/Assessment_pre and post scores - Sheet1.csv")                            
+
+# merged two tables above
+#total <- merge(aggregated_data,assessment_data,by="student_id")
+
+cormat <- round(cor(clean_merge2, use="pairwise.complete.obs", method ="pearson"), 2)
+
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(cormat,col=col(200), addCoef.col = "black",
+         type= "lower", method = "color", tl.col = "black", tl.cex = 0.9, tl.srt= 45, 
+         number.cex=0.9, diag=FALSE, sig.level = 0.05)
+```
+
+```{r}
+# boxplots for clusters
+library(ggplot2)
+
+clean_merge2$Cluster[clean_merge2$cluster_results=="1"] <- "Cluster1" 
+clean_merge2$Cluster[clean_merge2$cluster_results=="2"] <- "Cluster2" 
+clean_merge2$Cluster[clean_merge2$cluster_results=="3"] <- "Cluster3" 
+clean_merge2$Cluster[clean_merge2$cluster_results=="4"] <- "Cluster4" 
+
+
+boxplot1 <- ggplot(clean_merge2, aes(Cluster, y=o_distinct_completed, fill=Cluster)) + 
+  geom_boxplot() + labs(title = "o_distinct_completed", y="", x="")+ theme_classic()
+
+
+boxplot2 <- ggplot(clean_merge2, aes(Cluster, y=o_percent_gobacks, fill=Cluster)) + 
+  geom_boxplot() + labs(title = "o_percent_gobacks", y="", x="")+
+  theme_classic()
+
+boxplot3 <- ggplot(clean_merge2, aes(Cluster, y=o_avg_resets, fill=Cluster)) + 
+  geom_boxplot() + labs(title="o_avg_resets", y="", x="")+
+  theme_classic()
+
+boxplot4 <- ggplot(clean_merge2, aes(Cluster, y=o_avg_time_interaction_first, fill=Cluster)) + 
+  geom_boxplot() + labs(title="o_avg_time_interaction_first", y="", x="")+
+  theme_classic()
+
+boxplot1 
+boxplot2
+boxplot3
+boxplot4
+```
+
+```{r}
+# select variables to be used
+clean_merge3 <- clean_merge %>% select(o_percent_gobacks, 
+                                     o_distinct_completed,
+                                     o_avg_resets,
+                                     o_avg_time_interaction_first,
+                                     pre.total_math_score,
+                                     post.total_math_score,
+                                     stay_INPERSON,
+                                     stay_VIRTUAL,
+                                     INP_VIR,
+                                     VIR_INP,
+                                     cluster_results)
+# regular parallel coordinate graph
+ggparcoord(data=clean_merge3, columns=1:4, groupColumn="cluster_results", scale="centerObs")
+
+# cluster 1 highlighted
+ggparcoord(data=clean_merge3, columns=1:4, groupColumn="cluster_results", scale="centerObs") + scale_color_manual(values=c( "red", "#FFFFFF", "#FFFFFF", "#FFFFFF"))
+
+# cluster 2 highlighted
+ggparcoord(data=clean_merge3, columns=1:4, groupColumn="cluster_results", scale="centerObs") + scale_color_manual(values=c( "#FFFFFF", "green", "#FFFFFF", "#FFFFFF"))
+
+# cluster 3 highlighted
+ggparcoord(data=clean_merge3, columns=1:4, groupColumn="cluster_results", scale="centerObs") + scale_color_manual(values=c( "#FFFFFF", "#FFFFFF", "blue", "#FFFFFF"))
+
+# cluster 4 highlighted
+ggparcoord(data=clean_merge3, columns=1:4, groupColumn="cluster_results", scale="centerObs") + scale_color_manual(values=c( "#FFFFFF", "#FFFFFF", "#FFFFFF", "purple"))
+```
+
+```{r}
+# select variables to be used
+clean_merge3 <- clean_merge %>% select(o_percent_gobacks, 
+                                     o_distinct_completed,
+                                     o_avg_resets,
+                                     o_avg_time_interaction_first,
+                                     pre.total_math_score,
+                                     post.total_math_score,
+                                     stay_INPERSON,
+                                     stay_VIRTUAL,
+                                     INP_VIR,
+                                     VIR_INP,
+                                     cluster_results)
+ggparcoord(data=clean_merge3, columns=5:6, groupColumn="cluster_results", scale="centerObs", alphaLines = 0.25, title = "Pre & Post Test Scores by Cluster") + facet_wrap(~cluster_results)
+# cluster 1 highlighted
+ggparcoord(data=clean_merge3, columns=5:6, groupColumn="cluster_results", alphaLines = 0.25) + scale_color_manual(values=c( "red", "#FFFFFF", "#FFFFFF", "#FFFFFF"))
+
+# cluster 2 highlighted
+ggparcoord(data=clean_merge3, columns=5:6, groupColumn="cluster_results", alphaLines = 0.25) + scale_color_manual(values=c( "#FFFFFF", "green", "#FFFFFF", "#FFFFFF"))
+
+# cluster 3 highlighted
+ggparcoord(data=clean_merge3, columns=5:6, groupColumn="cluster_results", alphaLines = 0.25) + scale_color_manual(values=c( "#FFFFFF", "#FFFFFF", "blue", "#FFFFFF"))
+
+# cluster 4 highlighted
+ggparcoord(data=clean_merge3, columns=5:6, groupColumn="cluster_results", alphaLines = 0.25) + scale_color_manual(values=c( "#FFFFFF", "#FFFFFF", "#FFFFFF", "purple"))
+
+# dataframe of each cluster by itself
+cluster1 <- subset(clean_merge3, cluster_results == 1)
+cluster2 <- subset(clean_merge3, cluster_results == 2)
+cluster3 <- subset(clean_merge3, cluster_results == 3)
+cluster4 <- subset(clean_merge3, cluster_results == 4)
+
+# individual cluster scores
+ggparcoord(data=cluster1, columns=5:6, alphaLines = 0.25, title = "Cluster 1 Pre & Post Scores - N = 188", scale='globalminmax') 
+ggparcoord(data=cluster2, columns=5:6,alphaLines = 0.25, title = "Cluster 2 Pre & Post Scores - N = 186", scale='globalminmax')
+ggparcoord(data=cluster3, columns=5:6,alphaLines = 0.25, title = "Cluster 3 Pre & Post Scores - N = 76", scale='globalminmax')
+ggparcoord(data=cluster4, columns=5:6,alphaLines = 0.25, title = "Cluster 4 Pre & Post Scores - N = 310", scale='globalminmax')
+```
+```{r}
+clust <- clean_merge3
+clust$netscore <- (clean_merge3$post.total_math_score - clean_merge3$pre.total_math_score)
+clust$sub_type <- ifelse(clust$netscore < 0, "red", "green")
+clust <- clust[order(-clust$netscore),]
+
+cluster1sub <- cluster1
+cluster1sub$netscore <- (cluster1$post.total_math_score - cluster1$pre.total_math_score)
+cluster1sub$sub_type <- ifelse(cluster1sub$netscore < 0, "red", "green")
+cluster1sort <- cluster1sub[order(-cluster1sub$netscore),]
+
+cluster2sub <- cluster2
+cluster2sub$netscore <- (cluster2$post.total_math_score - cluster2$pre.total_math_score)
+cluster2sub$sub_type <- ifelse(cluster2sub$netscore < 0, "red", "green")
+cluster2sort <- cluster2sub[order(-cluster2sub$netscore),]
+
+cluster3sub <- cluster3
+cluster3sub$netscore <- (cluster3$post.total_math_score - cluster3$pre.total_math_score)
+cluster3sub$sub_type <- ifelse(cluster3sub$netscore < 0, "red", "green")
+cluster3sort <- cluster3sub[order(-cluster3sub$netscore),]
+
+cluster4sub <- cluster4
+cluster4sub$netscore <- (cluster4$post.total_math_score - cluster4$pre.total_math_score)
+cluster4sub$sub_type <- ifelse(cluster4sub$netscore < 0, "red", "green")
+cluster4sort <- cluster4sub[order(-cluster4sub$netscore),]
+```
+
+```{r}
+graph1 <- ggplot(cluster1sort, aes(x= reorder(rownames(cluster1sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster1sort$sub_type,
+           width=0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 1 - Changes in Test Scores", subtitle="Slow Progressors") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,5,1))
+graph1
+
+
+# graph1 <- ggplot(data=cluster1sort, ylab="", aes(x=netscore, y=rownames(cluster1sort), fill=sub_type)) + 
+#   geom_bar(stat='identity') + 
+#   theme(axis.text.y = element_blank(), panel.grid=element_blank(), axis.ticks.y=element_blank(), axis.title.y = element_blank()) + 
+#   ggtitle("Cluster 1 - Changes in Test Scores") +
+#   xlab("change from pretest score") +
+#   labs(fill="direction of change") +
+#   scale_x_continuous(breaks=seq(-10,5,1))
+# graph1
+
+graph2 <- ggplot(cluster2sort, aes(x= reorder(rownames(cluster2sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster2sort$sub_type,
+           width = 0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 2 - Changes in Test Scores", subtitle="Fast Progressors") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,10,1))
+graph2
+
+# graph2 <- ggplot(data=cluster2sort, ylab="", aes(x=netscore, y=rownames(cluster2sort), fill=sub_type)) + 
+#   geom_bar(stat='identity') + 
+#   theme(axis.text.y = element_blank(), panel.grid=element_blank(), axis.ticks.y=element_blank(), axis.title.y = element_blank())+ 
+#   ggtitle("Cluster 2 - Changes in Test Scores") +
+#   xlab("change from pretest score") +
+#   labs(fill="direction of change") +
+#   scale_x_continuous(breaks=seq(-10,10,1))
+# graph2
+
+graph3 <- ggplot(cluster3sort, aes(x= reorder(rownames(cluster3sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster3sort$sub_type,
+           width= 0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 3 - Changes in Test Scores", subtitle = "Repeaters/Slow-Steady Progressors") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,10,1))
+graph3
+
+# graph3 <- ggplot(data=cluster3sort, ylab="", aes(x=netscore, y=rownames(cluster3sort), fill=sub_type)) + 
+#   geom_bar(stat='identity') + 
+#   theme(axis.text.y = element_blank(), panel.grid=element_blank(), axis.ticks.y=element_blank(), axis.title.y = element_blank())+ 
+#   ggtitle("Cluster 3 - Changes in Test Scores") +
+#   xlab("change from pretest score") +
+#   labs(fill="direction of change") +
+#   scale_x_continuous(breaks=seq(-10,10,1))
+# graph3
+
+graph4 <- ggplot(cluster4sort, aes(x= reorder(rownames(cluster4sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster4sort$sub_type,
+           width = 0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 4 - Changes in Test Scores", subtitle="Intermediate Progressors") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,10,1))
+graph4
+
+# graph4 <- ggplot(data=cluster4sort, ylab="", aes(x=netscore, y=rownames(cluster4sort), fill=sub_type)) + 
+#   geom_bar(stat='identity') + 
+#   theme(axis.text.y = element_blank(), panel.grid=element_blank(), axis.ticks.y=element_blank(), axis.title.y = element_blank())+ 
+#   ggtitle("Cluster 4 - Changes in Test Scores") +
+#   xlab("change from pretest score") +
+#   labs(fill="direction of change") +
+#   scale_x_continuous(breaks=seq(-10,10,1))
+# graph4
+```
+
+
+```{r}
+barplot(clust$netscore, main="All Students - Changes in Test Scores", ylab="change in score", col=clust$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster1sort$netscore, main="Cluster 1 - Changes in Test Scores", ylab="change in score", sub="Slow Progressors",col=cluster1sort$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster2sort$netscore, main="Cluster 2 - Changes in Test Scores", ylab="change in score", sub="Fast Progressors", col=cluster2sort$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster3sort$netscore, main="Cluster 3 - Changes in Test Scores", ylab="change in score", sub="Repeaters/Slow-Steady Progressors", col=cluster3sort$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster4sort$netscore, main="Cluster 4 - Changes in Test Scores", ylab="change in score", sub="Intermediate Progressors", col=cluster4sort$sub_type, ylim=range(pretty(c(-8, 8))))
+```
+
+```{r}
+#library(treemapify)
+library(dplyr)
+library(data.table)
+clean_merge_move <- clean_merge %>% select(stay_INPERSON,
+                                     stay_VIRTUAL,
+                                     INP_VIR,
+                                     VIR_INP,
+                                     cluster_results)
+
+
+for(i in clean_merge_move) {
+  if(clean_merge_move$stay_INPERSON[i] == 1) {
+  clean_merge_move$movement[i] <- "INP"
+}
+  if(clean_merge_move$stay_VIRTUAL[i] == 1) {
+    clean_merge_move$movement[i] <- "VIR"
+  }
+    if(clean_merge_move$INP_VIR[i] == 1) {
+      clean_merge_move$movement[i] <- "INP_VIR"
+    }
+      if(clean_merge_move$VIR_INP[i] == 1) {
+        clean_merge_move$movement[i] <- "VIR_INP"
+      }
+        i = i+1
+}
+
+if(clean_merge_move$stay_INPERSON == 1) {
+  clean_merge_move$movement <- "INP"
+}
+if(clean_merge_move$stay_VIRTUAL == 1) {
+  clean_merge_move$movement <- "VIR"
+}
+if(clean_merge_move$INP_VIR == 1) {
+  clean_merge_move$movement <- "INP_VIR"
+}
+if(clean_merge_move$VIR_INP == 1) {
+  clean_merge_move$movement <- "VIR_INP"
+}
+
+cluster1move <- subset(clean_merge_move, cluster_results == 1)
+cluster2move <- subset(clean_merge_move, cluster_results == 2)
+cluster3move <- subset(clean_merge_move, cluster_results == 3)
+cluster4move <- subset(clean_merge_move, cluster_results == 4)
+
+# plot1 <- ggplot(cluster1move) +
+#   geom_col(aes(cluster_results, ))
+```
+
+
