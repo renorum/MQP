@@ -1,0 +1,500 @@
+---
+title: "MQP 2021-2022"
+author: "Reilly Norum"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+# set global chunk options...  
+knitr::opts_chunk$set(comment     = "",
+                      echo        = TRUE, 
+                      comment     = FALSE,
+                      warning     = FALSE, 
+                      message     = FALSE)
+```
+
+``````{r, echo=FALSE, results=FALSE, warning=FALSE, message=FALSE}
+### ----- load package(s) ----- ###
+
+library("tidyverse")    
+library("forcats")
+library("lubridate")    
+library("readxl")
+library("reshape2")
+library("data.table")
+library("dplyr")
+library("readr")
+
+library("psych")        
+library("furniture")    
+library("stargazer")    
+library("pander")       
+
+panderOptions('digits', 3)
+panderOptions('round', 3)
+panderOptions('keep.trailing.zeros', TRUE)
+
+library(cluster)  # clustering algorithms
+library(NbClust)  # clustering algorithms & visualization
+library(ggfortify)
+library(factoextra) # clustering
+library(lm.beta) # regression
+library(ggplot2) # visualizations
+library(GGally)
+```
+
+```{r}
+# importing data as csv
+aggregated_data <- read_csv("~/Desktop/MQP files/Data/aggregation_study2_clean.csv")
+assessment_data <- read_csv("~/Desktop/MQP files/Data/Assessment_pre and post scores - Sheet1.csv")
+
+# merge and cleaned csv
+clean_merge <- merge(aggregated_data,assessment_data,by="student_id") 
+
+# select variables to be used
+clean_merge2 <- clean_merge %>% select(o_percent_error,
+                                       o_percentage_hint,
+                                       o_avg_first_efficiency,
+                                       o_percent_interaction_step_first,
+                                     pre.total_math_score,
+                                     post.total_math_score)
+```
+
+```{r}
+# summary stats for test scores to determine which to use for cluster analysis
+print("pre.total_math_score")
+summary(clean_merge2$pre.total_math_score)
+print("mid.total_math_score")
+summary(clean_merge2$mid.total_math_score)
+print("post.total_math_score")
+summary(clean_merge2$post.total_math_score)
+print("delayed.total_math_score")
+summary(clean_merge2$delayed.total_math_score)
+```
+
+```{r}
+# numerical analysis for data with pre/post test scores
+# means of merged, cleaned data
+mean(clean_merge2$o_percent_error, na.rm = TRUE)
+mean(clean_merge2$o_completed_best_step, na.rm = TRUE)
+mean(clean_merge2$o_percentage_hint, na.rm = TRUE)
+mean(clean_merge2$o_avg_first_efficiency, na.rm = TRUE)
+mean(clean_merge2$o_interaction_step_first, na.rm = TRUE)
+mean(clean_merge2$post.total_math_score, na.rm = TRUE)
+mean(clean_merge2$pre.total_math_score, na.rm = TRUE)
+```
+
+```{r}
+# standard deviations of merged, cleaned data
+sd(clean_merge2$o_percent_error, na.rm = TRUE)
+sd(clean_merge2$o_percentage_hint, na.rm = TRUE)
+sd(clean_merge2$o_avg_first_efficiency, na.rm = TRUE)
+sd(clean_merge2$o_percent_interaction_step_first, na.rm = TRUE)
+sd(clean_merge2$post.total_math_score, na.rm = TRUE)
+sd(clean_merge2$pre.total_math_score, na.rm = TRUE)
+
+# boxplots of merged, cleaned data (no test scores)
+boxplot(clean_merge2$o_percent_error, main="o_percent_error", ylab="Percentage of Error")
+boxplot(clean_merge2$o_percentage_hint, main="o_percentage_hint", ylab="Percentage of Hint Used")
+boxplot(clean_merge2$o_avg_first_efficiency, main="o_avg_first_efficiency", ylab="Average Number of Efficient Steps")
+boxplot(clean_merge2$o_percent_interaction_step_first, main="o_interaction_step_first", ylab="Number of Valid First Steps")
+
+# histograms of merged, cleaned data (no test scores)
+hist(clean_merge2$o_percent_error)
+hist(clean_merge2$o_percentage_hint)
+hist(clean_merge2$o_avg_first_efficiency)
+hist(clean_merge2$o_percent_interaction_step_first)
+
+# maximum of each variable in merged data
+max(clean_merge2$o_percent_error, na.rm = TRUE)
+max(clean_merge2$o_percentage_hint, na.rm = TRUE)
+max(clean_merge2$o_avg_first_efficiency, na.rm = TRUE)
+max(clean_merge2$o_percent_interaction_step_first, na.rm = TRUE)
+max(clean_merge2$post.total_math_score, na.rm = TRUE)
+max(clean_merge2$pre.total_math_score, na.rm = TRUE)
+
+min(clean_merge2$o_percent_error, na.rm = TRUE)
+min(clean_merge2$o_percentage_hint, na.rm = TRUE)
+min(clean_merge2$o_avg_first_efficiency, na.rm = TRUE)
+min(clean_merge2$o_percent_interaction_step_first, na.rm= TRUE)
+
+mean(clean_merge2$o_percent_error, na.rm = TRUE)
+mean(clean_merge2$o_percentage_hint, na.rm = TRUE)
+mean(clean_merge2$o_avg_first_efficiency, na.rm = TRUE)
+mean(clean_merge2$o_percent_interaction_step_first, na.rm= TRUE)
+```
+
+```{r}
+# correlation analysis merged, cleaned data
+print("error and hint")
+cor(clean_merge2$o_percent_error,clean_merge$o_percentage_hint)
+print("error and efficiency")
+cor(clean_merge2$o_percent_error, clean_merge2$o_avg_first_efficiency)
+print( "error and validity")
+cor(clean_merge2$o_percent_error, clean_merge$o_percent_interaction_step_first)
+print( "hint and interaction step first")
+cor(clean_merge2$o_percentage_hint, clean_merge$o_percent_interaction_step_first)
+print("hint and efficiency")
+cor(clean_merge2$o_percentage_hint, clean_merge$o_avg_first_efficiency)
+print("efficiency and validity")
+cor(clean_merge2$o_avg_first_efficiency,clean_merge2$o_percent_interaction_step_first)
+print("pretest and error")
+cor(clean_merge2$pre.total_math_score, clean_merge$o_percent_error)
+print("hint and pretest")
+cor(clean_merge2$pre.total_math_score, clean_merge$o_percentage_hint)
+print("pretest and posttest")
+cor(clean_merge2$pre.total_math_score, clean_merge$post.total_math_score)
+print("pre and validity")
+cor(clean_merge2$pre.total_math_score, clean_merge$o_percent_interaction_step_first)
+print("pretest and efficiency")
+cor(clean_merge2$pre.total_math_score, clean_merge$o_avg_first_efficiency)
+print("posttest and error")
+cor(clean_merge2$post.total_math_score, clean_merge$o_percent_error)
+print("hint and posttest")
+cor(clean_merge2$post.total_math_score, clean_merge$o_percentage_hint)
+print("post and validity")
+cor(clean_merge2$post.total_math_score,clean_merge$o_percent_interaction_step_first)
+print("posttest and efficiency")
+cor(clean_merge2$post.total_math_score, clean_merge$o_avg_first_efficiency)
+```
+
+```{r}
+# p-values - merged, cleaned data
+cor.test(clean_merge2$o_percent_error,clean_merge$o_percentage_hint, method="pearson")
+cor.test(clean_merge2$o_percent_error, clean_merge2$o_avg_first_efficiency, method="pearson")
+cor.test(clean_merge2$o_percent_error, clean_merge$o_percent_interaction_step_first, method="pearson")
+cor.test(clean_merge2$o_percentage_hint, clean_merge$o_percent_interaction_step_first, method="pearson")
+cor.test(clean_merge2$o_percentage_hint, clean_merge$o_avg_first_efficiency, method="pearson")
+cor.test(clean_merge2$o_avg_first_efficiency, clean_merge2$o_percent_interaction_step_first, method="pearson")
+cor.test(clean_merge2$pre.total_math_score, clean_merge$o_percent_error, method="pearson")
+cor.test(clean_merge2$pre.total_math_score, clean_merge$o_percentage_hint, method="pearson")
+cor.test(clean_merge2$pre.total_math_score, clean_merge$post.total_math_score, method="pearson")
+cor.test(clean_merge2$pre.total_math_score, clean_merge$o_percent_interaction_step_first, method="pearson")
+cor.test(clean_merge2$pre.total_math_score, clean_merge$o_avg_first_efficiency, method="pearson")
+cor.test(clean_merge2$post.total_math_score, clean_merge$o_percent_error, method="pearson")
+cor.test(clean_merge2$post.total_math_score, clean_merge$o_percentage_hint, method="pearson")
+cor.test(clean_merge2$post.total_math_score, clean_merge$o_percent_interaction_step_first, method="pearson")
+cor.test(clean_merge2$post.total_math_score, clean_merge$o_avg_first_efficiency, method="pearson")
+```
+
+```{r}
+# minmax scaling
+minmax <- function(x){
+  return( (x-min(na.omit(x))) / (max(na.omit(x))-min(na.omit(x))) )
+}
+
+# min-max transformation and creating new variables
+clean_merge2$o_avg_first_efficiency <- minmax(clean_merge2$o_avg_first_efficiency)
+clean_merge2$o_percentage_hint <- minmax(clean_merge2$o_percentage_hint)
+clean_merge2$o_percent_error <- minmax(clean_merge2$o_percent_error)
+clean_merge2$o_percent_interaction_step_first <- minmax(clean_merge2$o_percent_interaction_step_first)
+clean_merge2$pre.total_math_score <- minmax(clean_merge2$pre.total_math_score)
+clean_merge2$post.total_math_score <- minmax(clean_merge2$post.total_math_score)
+
+# creating a new data frame 
+df_minmax <- clean_merge2 %>% select(o_avg_first_efficiency,
+                                     o_percentage_hint,
+                                     o_percent_error,
+                                     o_percent_interaction_step_first)
+
+# creating a data frame with test scores
+df_minmax2 <- clean_merge2 %>% select(pre.total_math_score,
+                                      post.total_math_score,
+                                     o_avg_first_efficiency,
+                                     o_percentage_hint,
+                                     o_percent_error,
+                                     o_percent_interaction_step_first)
+```
+
+```{r}
+# determine the number of clusters (4 methods)
+# Elbow method (widely used, recommended)
+fviz_nbclust(df_minmax, kmeans, method = "wss") +
+    geom_vline(xintercept = 4, linetype = 2)+
+  labs(subtitle = "Elbow method")
+
+# Silhouette method
+fviz_nbclust(df_minmax, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+
+# Gap statistic
+set.seed(123)
+fviz_nbclust(df_minmax, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+  labs(subtitle = "Gap statistic method")
+
+library(NbClust)
+nb <- NbClust(df_minmax, distance = "manhattan", min.nc = 2,
+        max.nc = 10, method = "kmeans", index ="all")
+
+# factoextra package 
+library(factoextra)
+fviz_nbclust(nb) + theme_minimal()
+```
+
+```{r}
+# applying kmeans clustering
+set.seed(20)
+fh2t_cluster <- kmeans(df_minmax, centers = 4, nstart = 25)
+str(fh2t_cluster) # inspect clusters, put the optimal number of clusters in "centers")  
+
+# Save the cluster number in the dataset as column 'cluster_results'
+clean_merge2$cluster_results <- as.factor(fh2t_cluster$cluster)
+clean_merge$cluster_results <- as.factor(fh2t_cluster$cluster)
+
+### Print the results
+print(fh2t_cluster)
+
+# add cluster column to csv
+write.csv(clean_merge2, "~/Desktop/MQP files/Data/ClusterData3_1.csv")
+```
+
+```{r}
+# correlation plot
+library("RColorBrewer")
+library("corrplot")
+
+cormat <- round(cor(df_minmax2, use="pairwise.complete.obs", method ="pearson"), 2)
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(cormat,col=col(200), addCoef.col = "black",
+         type= "lower", method = "color", tl.col = "black", tl.cex = 0.9, tl.srt= 45, 
+         number.cex=0.9, diag=FALSE, sig.level = 0.05)
+```
+
+```{r}
+# boxplots for clusters
+library(ggplot2)
+
+clean_merge2$Cluster[clean_merge2$cluster_results=="1"] <- "Cluster1" 
+clean_merge2$Cluster[clean_merge2$cluster_results=="2"] <- "Cluster2" 
+clean_merge2$Cluster[clean_merge2$cluster_results=="3"] <- "Cluster3" 
+clean_merge2$Cluster[clean_merge2$cluster_results=="4"] <- "Cluster4" 
+
+
+boxplot2 <- ggplot(clean_merge2, aes(Cluster, y=o_percentage_hint, fill=Cluster)) + 
+  geom_boxplot() + labs(title = "o_percentage_hint", y="", x="")+
+  theme_classic()
+
+boxplot3 <- ggplot(clean_merge2, aes(Cluster, y=o_percent_error, fill=Cluster)) + 
+  geom_boxplot() + labs(title="o_percent_error", y="", x="")+
+  theme_classic()
+
+boxplot4 <- ggplot(clean_merge2, aes(Cluster, y=o_avg_first_efficiency, fill=Cluster)) + 
+  geom_boxplot() + labs(title="o_avg_first_efficiency", y="", x="")+
+  theme_classic()
+
+boxplot5 <- ggplot(clean_merge2, aes(Cluster, y=o_percent_interaction_step_first, fill=Cluster)) + 
+  geom_boxplot() + labs(title="o_percent_interaction_step_first", y="", x="")+
+  theme_classic()
+
+boxplot2
+boxplot3
+boxplot4
+boxplot5
+```
+
+```{r}
+# regular parallel coordinate graph
+ggparcoord(data=clean_merge2, columns=5:6, groupColumn="cluster_results", scale="globalminmax", alphaLines = 0.4, title = "Change in Score by Cluster")
+
+# cluster 1 highlighted
+ggparcoord(data=clean_merge2, columns=5:6, groupColumn="cluster_results", scale="globalminmax", alphaLines = 0.2, title = "Change in Score by Cluster: Intermediate Knowledge Help Seekers") + scale_color_manual(values=c( "red", "#FFFFFF", "#FFFFFF", "#FFFFFF"))
+
+# cluster 2 highlighted
+ggparcoord(data=clean_merge2, columns=5:6, groupColumn="cluster_results", scale="globalminmax", alphaLines = 0.2, title = "Change in Score by Cluster: High Knowledge") + scale_color_manual(values=c( "#FFFFFF", "green", "#FFFFFF", "#FFFFFF"))
+
+# cluster 3 highlighted
+ggparcoord(data=clean_merge2, columns=5:6, groupColumn="cluster_results", scale="globalminmax", alphaLines = 0.2, title = "Change in Score by Cluster: Low Knowledge Not Seeking Help") + scale_color_manual(values=c( "#FFFFFF", "#FFFFFF", "blue", "#FFFFFF"))
+
+# cluster 4 highlighted
+ggparcoord(data=clean_merge2, columns=5:6, groupColumn="cluster_results", scale="globalminmax", alphaLines = 0.2, title = "Change in Score by Cluster: Intermediate Knowledge \nNot Seeking Help") + scale_color_manual(values=c( "#FFFFFF", "#FFFFFF", "#FFFFFF", "purple"))
+```
+
+```{r}
+# new data frame with select variables to be used
+clean_merge3 <- clean_merge %>% select(o_percent_error,
+                                       o_percentage_hint,
+                                       o_avg_first_efficiency,
+                                       o_percent_interaction_step_first,
+                                     pre.total_math_score,
+                                     post.total_math_score,
+                                     stay_INPERSON,
+                                     stay_VIRTUAL,
+                                     INP_VIR,
+                                     VIR_INP,
+                                     cluster_results)
+
+# dataframe of each cluster by itself
+cluster1 <- subset(clean_merge3, cluster_results == 1)
+cluster2 <- subset(clean_merge3, cluster_results == 2)
+cluster3 <- subset(clean_merge3, cluster_results == 3)
+cluster4 <- subset(clean_merge3, cluster_results == 4)
+```
+
+```{r}
+# pretest score means by cluster
+mean(cluster1$pre.total_math_score)
+mean(cluster2$pre.total_math_score)
+mean(cluster3$pre.total_math_score)
+mean(cluster4$pre.total_math_score)
+
+# posttest score means by cluster
+mean(cluster1$post.total_math_score)
+mean(cluster2$post.total_math_score)
+mean(cluster3$post.total_math_score)
+mean(cluster4$post.total_math_score)
+
+# pretest score std by cluster
+sd(cluster1$pre.total_math_score)
+sd(cluster2$pre.total_math_score)
+sd(cluster3$pre.total_math_score)
+sd(cluster4$pre.total_math_score)
+
+# posttest score std by cluster
+sd(cluster1$post.total_math_score)
+sd(cluster2$post.total_math_score)
+sd(cluster3$post.total_math_score)
+sd(cluster4$post.total_math_score)
+
+# pretest score median by cluster
+median(cluster1$pre.total_math_score)
+median(cluster2$pre.total_math_score)
+median(cluster3$pre.total_math_score)
+median(cluster4$pre.total_math_score)
+
+# posttest score median by cluster
+median(cluster1$post.total_math_score)
+median(cluster2$post.total_math_score)
+median(cluster3$post.total_math_score)
+median(cluster4$post.total_math_score)
+```
+
+```{r}
+# calculation of change in score & graph prep
+clust <- clean_merge3
+clust$netscore <- (clean_merge3$post.total_math_score - clean_merge3$pre.total_math_score)
+clust$sub_type <- ifelse(clust$netscore < 0, "red", "green")
+clust <- clust[order(-clust$netscore),]
+
+cluster1sub <- cluster1
+cluster1sub$netscore <- (cluster1$post.total_math_score - cluster1$pre.total_math_score)
+cluster1sub$sub_type <- ifelse(cluster1sub$netscore < 0, "red", "green")
+cluster1sort <- cluster1sub[order(-cluster1sub$netscore),]
+
+cluster2sub <- cluster2
+cluster2sub$netscore <- (cluster2$post.total_math_score - cluster2$pre.total_math_score)
+cluster2sub$sub_type <- ifelse(cluster2sub$netscore < 0, "red", "green")
+cluster2sort <- cluster2sub[order(-cluster2sub$netscore),]
+
+cluster3sub <- cluster3
+cluster3sub$netscore <- (cluster3$post.total_math_score - cluster3$pre.total_math_score)
+cluster3sub$sub_type <- ifelse(cluster3sub$netscore < 0, "red", "green")
+cluster3sort <- cluster3sub[order(-cluster3sub$netscore),]
+
+cluster4sub <- cluster4
+cluster4sub$netscore <- (cluster4$post.total_math_score - cluster4$pre.total_math_score)
+cluster4sub$sub_type <- ifelse(cluster4sub$netscore < 0, "red", "green")
+cluster4sort <- cluster4sub[order(-cluster4sub$netscore),]
+```
+
+```{r}
+graph1 <- ggplot(cluster1sort, aes(x= reorder(rownames(cluster1sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster1sort$sub_type,
+           width=0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 1 - Changes in Test Scores", subtitle="Intermediate Knowledge Help Seekers") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,5,1))
+graph1
+
+graph2 <- ggplot(cluster2sort, aes(x= reorder(rownames(cluster2sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster2sort$sub_type,
+           width = 0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 2 - Changes in Test Scores", subtitle="High Knowledge Not Seeking Help") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,10,1))
+graph2
+
+graph3 <- ggplot(cluster3sort, aes(x= reorder(rownames(cluster3sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster3sort$sub_type,
+           width= 0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 3 - Changes in Test Scores", subtitle = "Low Knowledge Not Seeking Help") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,10,1))
+graph3
+
+graph4 <- ggplot(cluster4sort, aes(x= reorder(rownames(cluster4sort), netscore), y=netscore)) + 
+  geom_bar(stat='identity',
+           show.legend = TRUE,
+           fill=cluster4sort$sub_type,
+           width = 0.5) + 
+  theme(axis.text.x = element_blank(), panel.grid=element_blank(), axis.ticks.x=element_blank(), axis.title.x = element_blank()) +
+  ggtitle("Cluster 4 - Changes in Test Scores", subtitle="Intermediate Knowledge Not Seeking Help") +
+  ylab("change from pretest score") +
+  labs(fill="direction of change") +
+  scale_y_continuous(breaks=seq(-10,10,1))
+graph4
+
+```
+
+```{r}
+# different diverging bar graphs
+barplot(clust$netscore, main="All Students - Changes in Test Scores", ylab="change in score", col=clust$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster1sort$netscore, main="Cluster 1 - Changes in Test Scores", ylab="change in score", sub="",col=cluster1sort$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster2sort$netscore, main="Cluster 2 - Changes in Test Scores", ylab="change in score", sub="", col=cluster2sort$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster3sort$netscore, main="Cluster 3 - Changes in Test Scores", ylab="change in score", sub="", col=cluster3sort$sub_type, ylim=range(pretty(c(-8, 8))))
+barplot(cluster4sort$netscore, main="Cluster 4 - Changes in Test Scores", ylab="change in score", sub="", col=cluster4sort$sub_type, ylim=range(pretty(c(-8, 8))))
+```
+
+```{r}
+# movement by cluster stacked bar graph
+g <- ggplot(clean_merge, aes(cluster_results))
+g + geom_bar(aes(fill=movement.y), width = 0.5) + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+  labs(title="Movement By Cluster")
+```
+
+```{r}
+# learning level by cluster stacked bar graph
+g <- ggplot(clean_merge, aes(cluster_results))
+g + geom_bar(aes(fill=PerformanceLevel), width = 0.5) + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6)) +
+  labs(title="Learning Level By Cluster")
+```
+
+```{r}
+# dummy variables for regression
+cluster1 <- ifelse(clean_merge2$Cluster == 'Cluster1', 1, 0)
+cluster2 <- ifelse(clean_merge2$Cluster == 'Cluster2', 1, 0)
+cluster3 <- ifelse(clean_merge2$Cluster == 'Cluster3', 1, 0)
+cluster4 <- ifelse(clean_merge2$Cluster == 'Cluster4', 1, 0)
+
+clean_merge2['Cluster1'] <- cluster1
+clean_merge2['Cluster2'] <- cluster2
+clean_merge2['Cluster3'] <- cluster3
+clean_merge2['Cluster4'] <- cluster4
+```
+
+```{r}
+# regression model 1
+library("lm.beta")
+model1 <- lm(post.total_math_score ~ Cluster4 + Cluster2 + Cluster3, data = clean_merge2)
+summary(model1)
+lm.beta(model1)
+
+# control for the pretest scores
+model2 <- lm(post.total_math_score ~ Cluster4 + Cluster2 + Cluster3 + pre.total_math_score, data = clean_merge2)
+summary(model2)
+lm.beta(model2)
+```
+
